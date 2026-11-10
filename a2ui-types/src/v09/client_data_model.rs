@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ClientDataModel {
-    /// Protocol version — always `"v0.9"`.
+    /// Protocol version — `"v0.9"` or `"v0.9.1"`.
     pub version: String,
 
     /// A map of surface IDs to their current data models.

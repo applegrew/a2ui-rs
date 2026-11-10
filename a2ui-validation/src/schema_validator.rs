@@ -150,4 +150,24 @@ mod tests {
         assert!(validator.validate(&json!({"x": 1}), "s1").is_ok());
         assert!(validator.validate(&json!({}), "s1").is_err());
     }
+
+    #[test]
+    fn test_draft_2020_12_unevaluated_properties() {
+        // v1.0 schemas use JSON Schema draft 2020-12 and `unevaluatedProperties`.
+        let schema = json!({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+                "version": { "const": "v1.0" }
+            },
+            "required": ["version"],
+            "unevaluatedProperties": false
+        });
+
+        let valid = json!({"version": "v1.0"});
+        assert!(validate(&schema, &valid, "s1").is_ok());
+
+        let invalid = json!({"version": "v1.0", "unexpected": true});
+        assert!(validate(&schema, &invalid, "s1").is_err());
+    }
 }

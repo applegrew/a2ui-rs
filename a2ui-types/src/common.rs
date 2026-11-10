@@ -84,15 +84,31 @@ impl From<String> for CatalogId {
 /// The A2UI spec version this library supports.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SpecVersion {
-    V0_8,
     V0_9,
+    V0_9_1,
+    V1_0,
+}
+
+impl SpecVersion {
+    /// Parse a protocol version string (e.g. `"v0.9"`, `"v0.9.1"`, or `"v1.0"`).
+    ///
+    /// Returns `None` for unknown versions.
+    pub fn parse(version: &str) -> Option<Self> {
+        match version {
+            "v0.9" => Some(Self::V0_9),
+            "v0.9.1" => Some(Self::V0_9_1),
+            "v1.0" => Some(Self::V1_0),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Display for SpecVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SpecVersion::V0_8 => write!(f, "v0.8"),
             SpecVersion::V0_9 => write!(f, "v0.9"),
+            SpecVersion::V0_9_1 => write!(f, "v0.9.1"),
+            SpecVersion::V1_0 => write!(f, "v1.0"),
         }
     }
 }

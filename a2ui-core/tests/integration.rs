@@ -96,7 +96,7 @@ async fn full_v09_flow_negotiate_build_validate_send() {
     let catalog_schema = json!({
         "type": "object",
         "properties": {
-            "version": { "const": "v0.9" },
+            "version": { "enum": ["v0.9", "v0.9.1"] },
             "createSurface": { "type": "object" },
             "updateComponents": { "type": "object" },
             "updateDataModel": { "type": "object" },
@@ -125,7 +125,7 @@ async fn full_v09_flow_negotiate_build_validate_send() {
 
     // 3. Build prompt context for LLM
     let prompt_ctx = build_prompt_context_v09(&catalog, &catalog_schema);
-    assert!(prompt_ctx.protocol_description.contains("v0.9"));
+    assert!(prompt_ctx.protocol_description.contains("v0.9.1"));
     assert!(prompt_ctx.catalog_schema_json.contains("version"));
 
     // 4. Build messages
@@ -173,65 +173,6 @@ async fn full_v09_flow_negotiate_build_validate_send() {
     assert_eq!(sent.len(), 3);
 
     // Verify what was sent is valid JSON
-    for msg_bytes in sent.iter() {
-        let _: serde_json::Value = serde_json::from_slice(msg_bytes).unwrap();
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Integration: Full v0.8 flow
-// ---------------------------------------------------------------------------
-
-#[tokio::test]
-async fn full_v08_flow() {
-    let sent_messages = Arc::new(Mutex::new(Vec::new()));
-    let transport = MockTransport {
-        sent: sent_messages.clone(),
-    };
-
-    // 1. Build messages
-    let begin_msg = BeginRenderingBuilder::new("main", "root")
-        .catalog_id("https://a2ui.org/specification/v0_8/standard_catalog_definition.json")
-        .build();
-
-    let surface_msg = SurfaceUpdateBuilder::new()
-        .surface_id("main")
-        .add_component(a2ui_types::v08::server_to_client::ComponentInstance {
-            id: "root".to_string(),
-            weight: None,
-            component: json!({"Column": {"children": {"explicitList": ["greeting"]}}}),
-        })
-        .add_component(a2ui_types::v08::server_to_client::ComponentInstance {
-            id: "greeting".to_string(),
-            weight: None,
-            component: json!({"Text": {"text": {"literalString": "Hello, world!"}}}),
-        })
-        .build();
-
-    let data_msg = DataModelUpdateBuilder::new("main")
-        .add_entry(a2ui_types::v08::data_model::DataEntry {
-            key: "username".to_string(),
-            value_string: Some("Alice".to_string()),
-            value_number: None,
-            value_boolean: None,
-            value_map: None,
-        })
-        .build();
-
-    // 2. Serialize and send
-    let bytes = serialize_message_v08(&begin_msg).unwrap();
-    transport.send_to_client(&bytes).await.unwrap();
-
-    let bytes = serialize_message_v08(&surface_msg).unwrap();
-    transport.send_to_client(&bytes).await.unwrap();
-
-    let bytes = serialize_message_v08(&data_msg).unwrap();
-    transport.send_to_client(&bytes).await.unwrap();
-
-    let sent = sent_messages.lock().unwrap();
-    assert_eq!(sent.len(), 3);
-
-    // Verify all sent messages are valid JSON
     for msg_bytes in sent.iter() {
         let _: serde_json::Value = serde_json::from_slice(msg_bytes).unwrap();
     }

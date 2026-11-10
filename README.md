@@ -1,8 +1,10 @@
 # a2ui-rs
 
-A runtime-agnostic, **stateless** Rust toolkit implementing the [A2UI protocol](https://a2ui.org) (v0.8 & v0.9) for server-side agent applications. It provides typed message models, catalog negotiation, LLM prompt generation, JSON Schema validation, and message builders — all as pure functions and minimal traits.
+A runtime-agnostic, **stateless** Rust toolkit implementing the [A2UI protocol](https://a2ui.org) (v0.9, v0.9.1, and v1.0) for server-side agent applications. It provides typed message models, catalog negotiation, LLM prompt generation, JSON Schema validation, and message builders — all as pure functions and minimal traits.
 
 **All session management, agent memory, and conversation state are owned by the agent harness (e.g. [Rig](https://github.com/0xPlaygrounds/rig)), not this library.**
+
+> **Note:** v1.0 is the current primary target. The v0.9-family modules (`v09`) are retained for compatibility; message builders default to emitting `"v0.9.1"` (the current production release).
 
 ## Architecture
 
@@ -20,9 +22,9 @@ A runtime-agnostic, **stateless** Rust toolkit implementing the [A2UI protocol](
 └──────┬──────────────────┬──────────────────┬─────────────────┘
        │                  │                  │
        ▼                  ▼                  ▼
-  CatalogProvider    a2ui-core         ClientTransport
-  (trait impl by     (pure functions   (trait impl by
-   harness/plugin)    + utilities)      harness/plugin)
+   CatalogProvider    a2ui-core         ClientTransport
+   (trait impl by     (pure functions   (trait impl by
+    harness/plugin)    + utilities)      harness/plugin)
 ```
 
 The library is a **toolkit**, not an engine. The harness calls into it; it never drives control flow.
@@ -31,7 +33,7 @@ The library is a **toolkit**, not an engine. The harness calls into it; it never
 
 | Crate | Description |
 |-------|-------------|
-| **`a2ui-types`** | Serde-based typed models for v0.8 and v0.9 messages, capabilities, catalogs, and data binding types. Pure data — no logic, no async. |
+| **`a2ui-types`** | Serde-based typed models for v0.9, v0.9.1, and v1.0 messages, capabilities, catalogs, and data binding types. Pure data — no logic, no async. |
 | **`a2ui-core`** | Traits (`ClientTransport`, `CatalogProvider`), pure functions for negotiation, validation, prompt building, message construction, and parsing. |
 | **`a2ui-validation`** | JSON Schema validation engine. Validates outgoing messages against catalog schemas and returns structured `ValidationError`s matching the spec's `VALIDATION_FAILED` format. |
 
@@ -40,32 +42,35 @@ The library is a **toolkit**, not an engine. The harness calls into it; it never
 ```
 a2ui-types/src/
 ├── common.rs           # SurfaceId, ComponentId, CatalogId, SpecVersion
-├── v08/
-│   ├── server_to_client.rs   # surfaceUpdate, beginRendering, dataModelUpdate, deleteSurface
-│   ├── client_to_server.rs   # userAction, error
-│   ├── capabilities.rs       # ClientCapabilities
-│   └── data_model.rs         # BoundValue, DataEntry, Action, Children
-└── v09/
-    ├── server_to_client.rs   # createSurface, updateComponents, updateDataModel, deleteSurface
-    ├── client_to_server.rs   # action, error (VALIDATION_FAILED)
-    ├── capabilities.rs       # ClientCapabilities, ServerCapabilities
-    ├── client_data_model.rs  # ClientDataModel (sendDataModel sync)
-    ├── common_types.rs       # DynamicString/Number/Boolean, ChildList, Action, FunctionCall, CheckRule
-    └── catalog.rs            # Catalog, FunctionDefinition
+├── v09/
+│   ├── server_to_client.rs   # createSurface, updateComponents, updateDataModel, deleteSurface
+│   ├── client_to_server.rs   # action, error (VALIDATION_FAILED)
+│   ├── capabilities.rs       # ClientCapabilities, ServerCapabilities
+│   ├── client_data_model.rs  # ClientDataModel (sendDataModel sync)
+│   ├── common_types.rs       # DynamicString/Number/Boolean, ChildList, Action, FunctionCall, CheckRule
+│   └── catalog.rs            # Catalog, FunctionDefinition
+└── v10/
+    ├── agent_to_renderer.rs  # createSurface, updateComponents, updateDataModel, deleteSurface,
+    │                         #   callRendererFunction, agentFunctionResponse
+    ├── renderer_to_agent.rs  # action, callAgentFunction, rendererFunctionResponse, error
+    ├── capabilities.rs       # RendererCapabilities, AgentCapabilities
+    ├── common_types.rs       # DataBinding (@path), FunctionCall (@call), Dynamic*,
+    │                         #   ChildList, Action, CheckRule, FunctionResponse, ValidationResult
+    └── catalog.rs            # Catalog
 
 a2ui-core/src/
 ├── traits.rs          # ClientTransport, CatalogProvider
 ├── negotiation.rs     # negotiate_catalog(), negotiate_catalog_with_inline()
 ├── validation.rs      # validate_message(), parse_client_message_*(), serialize_message_*()
-├── prompt.rs          # build_prompt_context_v08(), build_prompt_context_v09()
-├── message.rs         # CreateSurfaceBuilder, UpdateComponentsBuilder, etc.
+├── prompt.rs          # build_prompt_context_v09*(), build_prompt_context_v10()
+├── message.rs         # v0.9 and v1.0 message builders
 └── error.rs           # A2uiError
 
 a2ui-validation/src/
 └── schema_validator.rs  # SchemaValidator, validate()
 ```
 
-## Quick Start
+## Quick Start (v0.9 / v0.9.1)
 
 ### 1. Implement the Traits
 
@@ -80,7 +85,7 @@ struct MyCatalogProvider { /* ... */ }
 impl CatalogProvider for MyCatalogProvider {
     fn available_catalogs(&self) -> Vec<CatalogInfo> {
         vec![CatalogInfo {
-            catalog_id: CatalogId::new("https://a2ui.org/specification/v0_9/basic_catalog.json"),
+            catalog_id: CatalogId::new("https://a2ui.org/specification/v0_9_1/basic_catalog.json"),
             description: Some("Basic A2UI catalog".to_string()),
         }]
     }
@@ -114,7 +119,7 @@ use a2ui_core::negotiation::negotiate_catalog;
 
 // Client sends its supported catalog IDs (e.g. from a2uiClientCapabilities)
 let client_supported = vec![
-    "https://a2ui.org/specification/v0_9/basic_catalog.json".to_string(),
+    "https://a2ui.org/specification/v0_9_1/basic_catalog.json".to_string(),
 ];
 
 let result = negotiate_catalog(&client_supported, &my_catalog_provider)?;
@@ -129,6 +134,7 @@ use a2ui_core::prompt::build_prompt_context_v09;
 let catalog = my_catalog_provider.get_catalog(&result.catalog_id).unwrap();
 let schema = my_catalog_provider.get_catalog_schema(&result.catalog_id).unwrap();
 
+// Defaults to protocol version v0.9.1
 let prompt_ctx = build_prompt_context_v09(&catalog, &schema);
 
 // Inject into your LLM system prompt
@@ -145,7 +151,7 @@ use a2ui_core::message::*;
 use a2ui_core::validation::*;
 use serde_json::json;
 
-// Build a v0.9 createSurface message
+// Build a createSurface message (emits "v0.9.1" by default)
 let create_msg = CreateSurfaceBuilder::new("booking-surface", result.catalog_id.as_str())
     .send_data_model(true)
     .build();
@@ -188,15 +194,45 @@ match parsed {
             // Feed back to LLM for self-correction
         }
     }
-    ParsedClientMessage::V08(msg) => {
-        if let Some(action) = msg.user_action {
-            println!("v0.8 action: {}", action.name);
+    ParsedClientMessage::V10(msg) => {
+        if let Some(action) = msg.action {
+            println!("v1.0 action: {} on surface {}", action.name, action.surface_id.as_str());
         }
     }
 }
 ```
 
-### 7. Handle Validation Errors
+## Quick Start (v1.0)
+
+The v1.0 API lives under `a2ui_types::v10` and uses the reserved `@path` / `@call`
+keys for data bindings and function calls.
+
+```rust
+use a2ui_core::message::*;
+use a2ui_core::validation::serialize_message_v10;
+use a2ui_types::v10::common_types::FunctionCall;
+use serde_json::json;
+
+// createSurface can embed the initial component tree and data model
+let create_msg = CreateSurfaceBuilderV10::new("booking-surface")
+    .catalog_id("https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json")
+    .add_component(json!({"id": "root", "component": "Column", "children": ["greeting"]}))
+    .add_component(json!({"id": "greeting", "component": "Text", "text": {"@path": "/greeting"}}))
+    .data_model(json!({"greeting": "Hello, world!"}))
+    .build();
+
+let bytes = serialize_message_v10(&create_msg)?;
+
+// Execute a function on the renderer
+let call = FunctionCall {
+    call: "getScreenResolution".to_string(),
+    catalog_id: Some("https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json".to_string()),
+    args: Some(json!({"screenIndex": 0})),
+};
+let call_msg = call_renderer_function_v10("call_123", call);
+```
+
+## Handle Validation Errors
 
 When the LLM generates invalid A2UI JSON, the validation functions return structured errors that can be fed back to the LLM:
 
@@ -220,64 +256,51 @@ match validate_message(&llm_output_json, &catalog_schema, "my-surface") {
 }
 ```
 
-## v0.8 Usage
-
-The library fully supports v0.8 with separate type hierarchies:
-
-```rust
-use a2ui_core::message::*;
-use a2ui_core::validation::*;
-use a2ui_types::v08::server_to_client::ComponentInstance;
-use serde_json::json;
-
-// Begin rendering
-let begin_msg = BeginRenderingBuilder::new("main", "root")
-    .catalog_id("https://a2ui.org/specification/v0_8/standard_catalog_definition.json")
-    .build();
-
-// Surface update with components
-let surface_msg = SurfaceUpdateBuilder::new()
-    .surface_id("main")
-    .add_component(ComponentInstance {
-        id: "root".to_string(),
-        weight: None,
-        component: json!({"Column": {"children": {"explicitList": ["greeting"]}}}),
-    })
-    .build();
-
-// Serialize
-let bytes = serialize_message_v08(&begin_msg)?;
-```
-
 ## Spec Version Support Matrix
 
-| Feature | v0.8 | v0.9 |
-|---------|------|------|
-| Surface creation | `beginRendering` | `createSurface` |
-| Component updates | `surfaceUpdate` | `updateComponents` |
-| Data model updates | `dataModelUpdate` (adjacency list) | `updateDataModel` (JSON Pointer + value) |
-| Surface deletion | `deleteSurface` | `deleteSurface` |
-| Client actions | `userAction` | `action` |
-| Error reporting | `error` (flexible) | `error` (structured with `code`) |
-| Data binding | `BoundValue` (literalString/path) | `DynamicString`/`DynamicNumber`/`DynamicBoolean` |
-| Function calls | — | `FunctionCall` (client-side) |
-| Check rules | — | `CheckRule` (client-side validation) |
-| Data model sync | — | `sendDataModel` + `ClientDataModel` |
-| Server capabilities | — | `ServerCapabilities` |
-| Client capabilities | `supportedCatalogIds` | `supportedCatalogIds` + `inlineCatalogs` |
-| Theme | `styles` (free-form) | `theme` (schema-validated) |
-| Version field | Not required | Required (`"v0.9"`) |
-| Catalog negotiation | ✓ | ✓ (with inline support) |
-| Message validation | ✓ | ✓ |
-| Prompt generation | ✓ | ✓ |
+| Feature | v0.9 | v0.9.1 | v1.0 |
+|---------|------|--------|------|
+| Surface creation | `createSurface` | `createSurface` | `createSurface` (can embed `components` + `dataModel`) |
+| Component updates | `updateComponents` | `updateComponents` | `updateComponents` |
+| Data model updates | `updateDataModel` | `updateDataModel` | `updateDataModel` (`value` required) |
+| Surface deletion | `deleteSurface` | `deleteSurface` | `deleteSurface` |
+| Client actions | `action` | `action` | `action` (adds `userMessage`, `metadata`) |
+| Function calls | `FunctionCall` (`call`) | `FunctionCall` (`call`) | `FunctionCall` (`@call`); bidirectional `callRendererFunction` / `callAgentFunction` |
+| Data binding | `path` | `path` | `@path` (reserved `@` namespace) |
+| Check rules | `CheckRule` | `CheckRule` | `CheckRule` (structured `ValidationResult`) |
+| Data model sync | `sendDataModel` | `sendDataModel` | `sendDataModel` |
+| Capabilities | `ClientCapabilities` / `ServerCapabilities` | same | `RendererCapabilities` / `AgentCapabilities` |
+| Version field | `"v0.9"` | `"v0.9"` or `"v0.9.1"` | `"v1.0"` |
+| Catalog negotiation | ✓ | ✓ | ✓ (mixable catalogs) |
+| Message validation | ✓ | ✓ | ✓ |
+| Prompt generation | ✓ | ✓ | ✓ |
 
 ## Design Philosophy
 
 - **Stateless toolkit**: No session management, no surface tracking, no data model storage. The harness owns all state and calls library functions as needed.
 - **Runtime-agnostic**: Only the `ClientTransport` trait is async (via `async-trait`). Everything else is synchronous pure functions. No tokio/async-std dependency in the library itself.
-- **Separate type hierarchies**: `v08::ServerToClientMessage` and `v09::ServerToClientMessage` are distinct types. The harness chooses which module to use. No version-polymorphism overhead.
+- **Separate type hierarchies**: `v09::*` and `v10::*` are distinct types. The harness chooses which module to use. No version-polymorphism overhead.
 - **Catalog as typed + raw JSON**: `Catalog` structs for negotiation metadata; raw `serde_json::Value` for validation and LLM prompt injection.
 - **Spec-compatible error reporting**: `ValidationError` mirrors the A2UI `VALIDATION_FAILED` format so the harness can forward errors directly to the LLM or client.
+
+### v1.0 validation note
+
+The official v1.0 envelope schemas (`agent_to_renderer.json`, `renderer_to_agent.json`)
+reference `common_types.json` and `catalog.json` via relative `$ref`. `a2ui_validation`
+validates against whatever self-contained schema the harness supplies (it does not
+bundle or resolve the official spec files). To validate v1.0 messages against the full
+envelope schema, pass a schema that has been bundled/resolved (e.g. via a JSON Schema
+bundler) or a catalog-specific schema. The `jsonschema` backend supports JSON Schema
+draft 2020-12 (including `unevaluatedProperties`).
+
+## TODO
+
+- **Typed v1.0 `CatalogProvider`**: The `CatalogProvider` trait's `get_catalog` still
+  returns the v0.9 `a2ui_types::v09::catalog::Catalog` type. v1.0 negotiation and
+  prompt building don't depend on it (they use catalog IDs and raw schemas), but a
+  fully v1.0-typed provider is not yet available. Add a v1.0 catalog-returning trait
+  (or make `CatalogProvider` version-agnostic) so v1.0 harnesses can supply a typed
+  `a2ui_types::v10::catalog::Catalog`.
 
 ## Dependencies
 
@@ -294,7 +317,7 @@ let bytes = serialize_message_v08(&begin_msg)?;
 # Build all crates
 cargo build
 
-# Run all tests (60 tests across unit, round-trip, and integration)
+# Run all tests
 cargo test
 
 # Run tests for a specific crate

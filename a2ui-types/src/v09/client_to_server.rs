@@ -2,12 +2,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::SurfaceId;
 
-/// A single client-to-server message in v0.9.
+/// A single client-to-server message in v0.9-family.
 /// Must contain `version` and exactly one of `action` or `error`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ClientToServerMessage {
-    /// Protocol version — always `"v0.9"`.
+    /// Protocol version — `"v0.9"` or `"v0.9.1"`.
     pub version: String,
 
     /// Reports a user-initiated action from a component.

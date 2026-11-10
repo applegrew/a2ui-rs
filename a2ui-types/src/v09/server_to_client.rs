@@ -2,13 +2,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::SurfaceId;
 
-/// A single server-to-client message in the v0.9 A2UI stream.
+/// A single server-to-client message in the v0.9-family A2UI stream.
 /// Each message must contain exactly one of the four message types,
-/// plus a mandatory `version` field set to `"v0.9"`.
+/// plus a mandatory `version` field set to `"v0.9"` or `"v0.9.1"`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ServerToClientMessage {
-    /// Protocol version — always `"v0.9"`.
+    /// Protocol version — `"v0.9"` or `"v0.9.1"`.
     pub version: String,
 
     /// Creates a new surface and begins rendering.
